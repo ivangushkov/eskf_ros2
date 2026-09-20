@@ -4,7 +4,14 @@ RotationQuaternion::RotationQuaternion(float real_part, Eigen::Vector3d vec_part
     : real_part{real_part}, vec_part{vec_part}    
 {
 
-    // TODO: implement some checks for the unit quaternion
+    // Make sure we initialize as a unit quaternion
+    this->normalize();
+
+    // Get shortest rotation
+    if (real_part < 0) {
+        real_part *= -1;
+        vec_part *= -1;
+    }
 
 };
 
