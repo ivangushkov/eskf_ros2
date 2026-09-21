@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "quaternions/quaternions.h"
+#include "eskf/eskf.h"
 #include<Eigen/Dense>
 
 
@@ -10,22 +11,28 @@ int main(int argc, char ** argv)
   
   (void) argc;
   (void) argv;
-  Eigen::Vector3d test_vec;
-  float test_real = 6.7;
+  
 
-  test_vec << 4, 2, 0;
+  Eigen::Vector3d gnss_lever;
+  gnss_lever << 1.0, 0.0, 2.0;
+  
+  
+  ESKFParams p{
+    2.0,                              // accm_std
+    4.0,                              // accm_bias_std
+    6.0,                              // accm_bias_p
+    8.0,                              // gyro_std
+    10.0,                             // gyro_bias_std
+    12.0,                             // gyro_bias_p
+    20.0,                             // gnss_std_ne;
+    20.0,                             // gnss_std_d;
+    Eigen::MatrixXd::Identity(3, 3),  // accm_correction
+    Eigen::MatrixXd::Identity(3, 3),  // gyro_correction 
+    gnss_lever                        // gnss lever arm
+  };
+  
 
-  RotationQuaternion test_quat(test_real, test_vec);
-  RotationQuaternion test_quat2(test_real, test_vec);
-
-  test_quat.normalize();
-  test_quat2.normalize();
-
-  std::cout << test_quat.vec_part << std::endl;
-  std::cout << test_quat.as_rotmat() << std::endl;
-  std::cout << test_quat.as_avec() << std::endl;
-
-  std::cout << test_quat.multiply(test_quat2).vec_part << std::endl;
+  ESKF eskf(p);
 
   printf("hello world eskf package\n");
   return 0;

@@ -13,18 +13,32 @@ find_package(Eigen3 REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-# PID library
+# Rotation quaternions library
 add_library(quaternions
   src/quaternions.cpp
 )
 
-target_include_directories(quaternions PUBLIC
+# ESKF implementation
+add_library(eskf
+  src/eskf.cpp
+)
+
+target_include_directories(
+  quaternions
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(
+  eskf
+  PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
 
-add_executable(eskf_node src/eskf_node.cpp src/quaternions.cpp)
+add_executable(eskf_node src/eskf_node.cpp src/quaternions.cpp src/eskf.cpp)
 
 target_include_directories(eskf_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -38,6 +52,11 @@ Eigen3::Eigen
 )
 
 target_link_libraries(quaternions
+PUBLIC
+Eigen3::Eigen
+)
+
+target_link_libraries(eskf
 PUBLIC
 Eigen3::Eigen
 )

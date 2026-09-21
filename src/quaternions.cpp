@@ -1,5 +1,12 @@
 #include "quaternions/quaternions.h"
 
+// Default initialization to the zero-rotation quaternion
+RotationQuaternion::RotationQuaternion()
+    : real_part {1.0}, vec_part {Eigen::Vector3d::Zero()}
+{
+
+};
+
 RotationQuaternion::RotationQuaternion(float real_part, Eigen::Vector3d vec_part)
     : real_part{real_part}, vec_part{vec_part}    
 {
