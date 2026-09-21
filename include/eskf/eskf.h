@@ -2,6 +2,9 @@
 #pragma once
 
 #include<Eigen/Dense>
+#include <unsupported/Eigen/MatrixFunctions>
+
+#include <cmath>
 #include "quaternions/quaternions.h"
 
 // Tuning of the ESKF
@@ -17,8 +20,8 @@ struct ESKFParams{
     float gnss_std_ne;
     float gnss_std_d; 
 
-    Eigen::Matrix3d accm_correction;
-    Eigen::Matrix3d gyro_correction;
+    Eigen::Matrix3d accm_correction_matrix;
+    Eigen::Matrix3d gyro_correction_matrix;
     Eigen::Vector3d gnss_lever;
 };
 
@@ -50,6 +53,11 @@ struct GNSSMeasurement{
     float ts;
 };
 
+struct ErrorStateModel{
+    Eigen::MatrixXd A;
+    Eigen::MatrixXd GQGT;
+};
+
 class ESKF {
     public:
         ESKF();
@@ -69,4 +77,16 @@ class ESKF {
 
         NominalState nomState;
         ErrorStateGauss errorState;
-};
+
+        NominalState nomState_aided;
+        ErrorStateGauss errorState_aided;
+
+        Eigen::Matrix3d skew_symmetric(Eigen::Vector3d vec);
+
+        IMUMeasurement correctIMUMeasurement(NominalState x_nom_prev, IMUMeasurement z_imu);
+        NominalState predictNominalState(NominalState x_nom_prev, IMUMeasurement z_imu_corr);
+        ErrorStateGauss predictErrorState(NominalState x_nom_prev, ErrorStateGauss x_err_gauss, IMUMeasurement z_imu_corr);
+
+
+
+    };

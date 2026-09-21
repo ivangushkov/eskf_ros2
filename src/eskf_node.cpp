@@ -33,8 +33,6 @@ int main(int argc, char ** argv)
   
 
   ESKF eskf(p);
-
-  printf("hello world eskf package\n");
   return 0;
 
 
