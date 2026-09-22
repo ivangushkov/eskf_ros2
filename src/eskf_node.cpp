@@ -24,7 +24,8 @@ int main(int argc, char ** argv)
     8.0,                              // gyro_std
     10.0,                             // gyro_bias_std
     12.0,                             // gyro_bias_p
-    20.0,                             // gnss_std_ne;
+    20.0,                             // gnss_std_n;
+    20.0,                             // gnss_std_e;
     20.0,                             // gnss_std_d;
     Eigen::MatrixXd::Identity(3, 3),  // accm_correction
     Eigen::MatrixXd::Identity(3, 3),  // gyro_correction 

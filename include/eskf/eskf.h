@@ -64,7 +64,7 @@ struct GNSSMeasurementGauss{
     Eigen::Vector3d mean;
     Eigen::Matrix3d cov;
     float ts;
-}
+};
 
 class ESKF {
     public:
@@ -103,7 +103,7 @@ class ESKF {
 
         // GNSS update methods
         GNSSMeasurementGauss predictGNSSMeasurement(NominalState xNom, ErrorStateGauss xErr, GNSSMeasurement zGNSS, Eigen::MatrixXd H);
-        ErrorStateGauss updateErrorState(NominalState xNomPrev, ErrorState xErrPrev, GNSSMeasurementGauss zGNSSPred, GNSSMeasurement zGNSS, Eigen::MatrixXd H);
+        ErrorStateGauss updateErrorState(ErrorStateGauss xErrPrev, GNSSMeasurementGauss zGNSSPred, GNSSMeasurement zGNSS, Eigen::MatrixXd H);
         ESKFState inject(NominalState xNomPrev, ErrorStateGauss xErrUpd);
 
 

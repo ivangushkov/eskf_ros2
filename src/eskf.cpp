@@ -33,7 +33,7 @@ ESKF::ESKF(ESKFParams p)
     g << 0.0, 0.0, 9.81;
 
     // GNSS measurement covariance
-    gnssCov = Eigen::Matrix3d::Zero()
+    gnssCov = Eigen::Matrix3d::Zero();
     gnssCov(0, 0) = p.gnss_std_n;
     gnssCov(1, 1) = p.gnss_std_e;
     gnssCov(2, 2) = p.gnss_std_d;
@@ -76,18 +76,18 @@ IMUMeasurement ESKF::correctIMUMeasurement(NominalState x_nom_prev, IMUMeasureme
 
 NominalState ESKF::predictNominalState(NominalState x_nom_prev, IMUMeasurement z_imu_corr) {
 
-    float Ts = z_corr.ts;
+    float Ts = z_imu_corr.ts;
 
-    Eigen::Vector3d acc = x_nom_prev.ori.as_rotmat() * z_corr.acc + g;
+    Eigen::Vector3d acc = x_nom_prev.ori.as_rotmat() * z_imu_corr.acc + g;
 
     // Incremental quaternion from the angular velocity
-    Eigen::Vector3d omegaIncrement = Ts * z_corr.avel;
+    Eigen::Vector3d omegaIncrement = Ts * z_imu_corr.avel;
     RotationQuaternion quatIncrement = RotationQuaternion(
         std::cos(omegaIncrement.norm()/2), 
         std::sin(omegaIncrement.norm()/2) * omegaIncrement / omegaIncrement.norm()
     );
 
-    NominalState x_nom_pred = NominalState; 
+    NominalState x_nom_pred; 
     
     // Numerical integration of the dynamics
     x_nom_pred.pos = x_nom_prev.pos + Ts * x_nom_prev.vel + (std::pow(Ts, 2) / 2) * acc;
@@ -100,17 +100,17 @@ NominalState ESKF::predictNominalState(NominalState x_nom_prev, IMUMeasurement z
 
 }
 
-ErrorStateGauss predictErrorState(NominalState x_nom_prev, ErrorStateGauss x_err_gauss, IMUMeasurement z_imu_corr) {
+ErrorStateGauss ESKF::predictErrorState(NominalState x_nom_prev, ErrorStateGauss x_err_gauss, IMUMeasurement z_imu_corr) {
 
-    Eigen::MatrixXd::Zero(15,15) Ac;
+    Eigen::MatrixXd Ac = Eigen::MatrixXd::Zero(15,15);
     Eigen::Matrix3d Rq = x_nom_prev.ori.as_rotmat();
 
     // Error state dynamics matrix A(x) in continious time
 
     Ac.block(0, 3, 3, 3) = Eigen::Matrix3d::Identity();
-    Ac.block(3, 6, 3, 3) = -Rq * this->skew_symmetric(z_corr.acc);
+    Ac.block(3, 6, 3, 3) = -Rq * this->skew_symmetric(z_imu_corr.acc);
     Ac.block(3, 9, 3, 3) = -Rq * p.accm_correction_matrix;
-    Ac.block(6, 6, 3, 3) = -this->skew_symmetric(z_corr.avel);
+    Ac.block(6, 6, 3, 3) = -this->skew_symmetric(z_imu_corr.avel);
     Ac.block(6, 12, 3, 3) = - p.gyro_correction_matrix;
     Ac.block(9, 9, 3, 3) = - p.accm_bias_p * Eigen::Matrix3d::Identity();
     Ac.block(12, 12, 3, 3) = -p.gyro_bias_p * Eigen::Matrix3d::Identity();
@@ -118,7 +118,7 @@ ErrorStateGauss predictErrorState(NominalState x_nom_prev, ErrorStateGauss x_err
 
     // Transformation of the process noise in continuous time GQGTc
 
-    Eigen::MatrixXd::Zero(15, 12) G;
+    Eigen::MatrixXd G = Eigen::MatrixXd::Zero(15, 12);
 
     G.block(3, 0, 3, 3) = -Rq;
     G.block(6, 3, 3, 3) = - Eigen::Matrix3d::Identity();
@@ -128,32 +128,33 @@ ErrorStateGauss predictErrorState(NominalState x_nom_prev, ErrorStateGauss x_err
     Eigen::MatrixXd GQGTc = G * Q_err * G.transpose();
 
     // Discretization of system matrix and process noise
-    float Ts = z_corr.ts;
-    Eigen::MatrixXd::Zeros(30, 30) VL; // VanLoan matrix
+    float Ts = z_imu_corr.ts;
+    Eigen::MatrixXd VL = Eigen::MatrixXd::Zero(30, 30); // VanLoan matrix
 
     //VL.block(0, 0, Ac.rows(), Ac.cols()) = -Ac;
     //VL.block(Ac.)
 
     VL.topLeftCorner(Ac.rows(), Ac.cols()) = -Ac;
-    VL.topRigthCorner(GQGTc.rows(), GQGTc.cols()) = GQGTc;
+    VL.topRightCorner(GQGTc.rows(), GQGTc.cols()) = GQGTc;
     VL.bottomRightCorner(Ac.rows(), Ac.cols()) = Ac.transpose();
 
     VL *= Ts;
     VL = VL.exp();
 
     Eigen::MatrixXd VL1 = VL.bottomRightCorner(Ac.rows(), Ac.cols());
-    Eigen::MatrixXd VL2 = VL.topRigthCorner(Ac.rows(), Ac.cols());
+    Eigen::MatrixXd VL2 = VL.topRightCorner(Ac.rows(), Ac.cols());
 
     // Finally Ad and GQGTd
     Eigen::MatrixXd Ad = VL1.transpose();
     Eigen::MatrixXd GQGTd = VL1.transpose() * VL2;
 
-    x_err_gauss = ErrorStateGauss{
+    ErrorStateGauss x_err_gauss_pred{
         Ad * x_err_gauss.mean,
-        Ad * x_err_gauss.cov * Ad.transpose() + GQGTd;
+        Ad * x_err_gauss.cov * Ad.transpose() + GQGTd,
+        z_imu_corr.ts
     };
 
-    return x_err_gauss;
+    return x_err_gauss_pred;
     
 }
 
@@ -163,7 +164,7 @@ void ESKF::predictFromIMU(IMUMeasurement z_imu) {
     ErrorStateGauss x_err_gauss = errorState;
 
     // Correct the IMU measurements for mounting errors
-    IMUMeasurement z_corr = this->correctIMUMeasurement(x_nom_prev, z_imu);
+    IMUMeasurement z_imu_corr = this->correctIMUMeasurement(x_nom_prev, z_imu);
 
     // Integrate the nominal system dynamics with the imu as input
     NominalState x_nom_pred = this->predictNominalState(x_nom_prev, z_imu_corr);
@@ -180,7 +181,7 @@ Eigen::MatrixXd ESKF::gnssMeasurementJacobian(NominalState xNom) {
 
     Eigen::MatrixXd H = Eigen::MatrixXd::Zero(3,15);
     
-    H.block(0, 0, 3, 3) = Eigen::Matrix3D::Identity();
+    H.block(0, 0, 3, 3) = Eigen::Matrix3d::Identity();
     H.block(0, 6, 3, 3) = - xNom.ori.as_rotmat() * this->skew_symmetric(p.gnss_lever);
     
     return H;
@@ -199,14 +200,14 @@ GNSSMeasurementGauss ESKF::predictGNSSMeasurement(NominalState xNom, ErrorStateG
     return zGNSSPred;
 }
 
-ErrorStateGauss ESKF::updateErrorState(NominalState xNomPrev, ErrorState xErrPrev, GNSSMeasurementGauss zGNSSPred, GNSSMeasurement zGNSS, Eigen::MatrixXd H) {
+ErrorStateGauss ESKF::updateErrorState(ErrorStateGauss xErrPrev, GNSSMeasurementGauss zGNSSPred, GNSSMeasurement zGNSS, Eigen::MatrixXd H) {
 
     Eigen::MatrixXd P = xErrPrev.cov;
-    R = gnssCov;
+    Eigen::Matrix3d R = gnssCov;
 
     // Kalman Gain
-    Eigen::MatrixXd W = P * H.transpose() * (H * P * H.transpose() + R).inv();
-    Eigen::MatrixXd IWH = Eigen::MatrixXd::Identity(P.rows(), P.cows()) - W * H;
+    Eigen::MatrixXd W = P * H.transpose() * (H * P * H.transpose() + R).inverse();
+    Eigen::MatrixXd IWH = Eigen::MatrixXd::Identity(P.rows(), P.cols()) - W * H;
 
     Eigen::VectorXd errMean = W * (zGNSS.pos - zGNSSPred.mean);
     Eigen::MatrixXd errCov = IWH * P * IWH.transpose() + W * R * W.transpose();
@@ -232,10 +233,10 @@ ESKFState ESKF::inject(NominalState xNomPrev, ErrorStateGauss xErrUpd) {
     updatedState.nomState.accm_bias = xNomPrev.accm_bias + xErrUpd.mean(Eigen::seq(12,14));
 
     // Reset the error state mean
-    updatedState.errorState.mean(xErrUpd.size()).setZero();
+    updatedState.errorState.mean = Eigen::VectorXd::Zero(xErrUpd.mean.size());
     
     // Final update to the error state covariance
-    Eigen::MatrixXd G = Eigen::MatrixXd::Identity(15, 15)
+    Eigen::MatrixXd G = Eigen::MatrixXd::Identity(15, 15);
     G.block(6, 6, 3, 3) -= this->skew_symmetric(errTheta); // this will need thorough debugging!
     updatedState.errorState.cov = G * xErrUpd.cov * G.transpose();
 
@@ -252,7 +253,7 @@ void ESKF::updateFromGNSS(GNSSMeasurement zGNSS) {
     Eigen::MatrixXd H = this->gnssMeasurementJacobian(xNomPrev);
 
     GNSSMeasurementGauss zGNSSPred = this->predictGNSSMeasurement(xNomPrev, xErrPrev, zGNSS, H);
-    ErrorStateGauss xErrUpd = this->updateErrorState(xNomPrev, xErrPrev, zGNSSPred, zGNSS, H);
+    ErrorStateGauss xErrUpd = this->updateErrorState(xErrPrev, zGNSSPred, zGNSS, H);
     ESKFState updatedState = this->inject(xNomPrev, xErrUpd);
 
     // Set the internal state as the injected state
