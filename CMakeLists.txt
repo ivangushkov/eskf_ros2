@@ -12,6 +12,8 @@ find_package(Eigen3 REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(nav_msgs REQUIRED)
+
 
 # uncomment the following section in order to fill in
 # further dependencies manually.
@@ -55,7 +57,7 @@ target_include_directories(
 
 add_executable(eskf_node src/eskf_node.cpp)
 
-ament_target_dependencies(eskf_node rclcpp std_msgs sensor_msgs)
+ament_target_dependencies(eskf_node rclcpp std_msgs sensor_msgs nav_msgs)
 
 target_include_directories(eskf_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

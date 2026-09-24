@@ -14,6 +14,7 @@
 #include "std_msgs/msg/string.hpp"
 #include "sensor_msgs/msg/imu.hpp"
 #include "sensor_msgs/msg/nav_sat_fix.hpp"
+#include "nav_msgs/msg/odometry.hpp"
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -27,7 +28,7 @@ class ESKFNode : public rclcpp::Node
     ESKFNode()
     : Node("boaty_eskf_node"), gnssConverter {GNSS2NED(40.0, 3.0, 0.0)}, eskf(makeEskfParams())
     {
-      publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
+      publisher_eskf = this->create_publisher<nav_msgs::msg::Odometry>("/boaty/odom_filtered", 10);
       timer_ = this->create_wall_timer(
       500ms, std::bind(&ESKFNode::timer_callback, this));
 
@@ -52,6 +53,32 @@ class ESKFNode : public rclcpp::Node
     {
       //RCLCPP_INFO(this->get_logger(), "Received IMU!");
       //std::cout << msg.linear_acceleration.z << std::endl;
+      
+      const rclcpp::Time measurement_time(msg.header.stamp);
+
+      if (first_measurement) {
+        // initialize from the IMU measurement
+        last_filter_time_ = measurement_time;
+        first_measurement = 0;
+        return;
+      }
+
+      float ts = (measurement_time - last_filter_time_).seconds();
+
+      if (ts <= 0.0) {
+        RCLCPP_INFO(get_logger(), "Ignoring duplicate or out of sequence measurement");
+        return;
+      }
+
+      Eigen::Vector3d acc;
+      Eigen::Vector3d avel;
+
+      acc << msg.linear_acceleration.x, msg.linear_acceleration.y, msg.linear_acceleration.z;
+      avel << msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z;
+      
+      IMUMeasurement zIMU{acc, avel, ts};
+
+      eskf.predictFromIMU(zIMU);
 
     }
 
@@ -64,29 +91,52 @@ class ESKFNode : public rclcpp::Node
       //RCLCPP_INFO(this->get_logger(), "Converted to NED: !");
       //std::cout << gnssNED << std::endl;
 
+      const rclcpp::Time measurement_time(msg.header.stamp);
+
+      if (first_measurement) {
+        // initialize from the IMU measurement
+        last_filter_time_ = measurement_time;
+        first_measurement = 0;
+        return;
+      }
+
+      float ts = (measurement_time - last_filter_time_).seconds();
+
+      if (ts <= 0.0) {
+        RCLCPP_INFO(get_logger(), "Ignoring duplicate or out of sequence measurement");
+        return;
+      }
+
+      GNSSMeasurement zGNSS{gnssNED, ts};
+
+      eskf.updateFromGNSS(zGNSS);
+
     }
 
     rclcpp::TimerBase::SharedPtr timer_;
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_eskf;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_imu;
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subscription_gnss;
 
+    rclcpp::Time last_filter_time_; // for calculating dt
+    bool first_measurement{1};
+    
     GNSS2NED gnssConverter;
     
     static ESKFParams makeEskfParams(){
       Eigen::Vector3d gnss_lever;
-      gnss_lever << 1.0, 0.0, 2.0;
+      gnss_lever << 0.5, 0.25, -0.4;
       
       return ESKFParams{
-      2.0, // accm_std
-      4.0, // accm_bias_std
-      6.0, // accm_bias_p
-      8.0, // gyro_std
-      10.0, // gyro_bias_std
-      12.0, // gyro_bias_p
-      20.0, // gnss_std_n
-      20.0, // gnss_std_e
-      20.0, // gnss_std_d
+      0.10, // accm_std
+      0.25, // accm_bias_std
+      0.0005, // accm_bias_p
+      0.10, // gyro_std
+      0.25, // gyro_bias_std
+      0.0005, // gyro_bias_p
+      0.5, // gnss_std_n
+      0.5, // gnss_std_e
+      0.5, // gnss_std_d
       Eigen::MatrixXd::Identity(3, 3), // accm_correction
       Eigen::MatrixXd::Identity(3, 3), // gyro_correction
       gnss_lever // GNSS lever arm
