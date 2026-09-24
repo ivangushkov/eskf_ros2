@@ -25,7 +25,7 @@ class ESKFNode : public rclcpp::Node
 {
   public:
     ESKFNode()
-    : Node("boaty_eskf_node"), count_(0), gnssConverter {GNSS2NED(40.0, 3.0, 0.0)}
+    : Node("boaty_eskf_node"), gnssConverter {GNSS2NED(40.0, 3.0, 0.0)}, eskf(makeEskfParams())
     {
       publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
       timer_ = this->create_wall_timer(
@@ -36,28 +36,6 @@ class ESKFNode : public rclcpp::Node
 
       subscription_gnss = this->create_subscription<sensor_msgs::msg::NavSatFix>(
       "/boaty/gnss", 10, std::bind(&ESKFNode::gnss_callback, this, _1));
-
-      Eigen::Vector3d gnss_lever;
-      gnss_lever << 1.0, 0.0, 2.0;
-
-      ESKFParams p{
-        2.0,                              // accm_std
-        4.0,                              // accm_bias_std
-        6.0,                              // accm_bias_p
-        8.0,                              // gyro_std
-        10.0,                             // gyro_bias_std
-        12.0,                             // gyro_bias_p
-        20.0,                             // gnss_std_n;
-        20.0,                             // gnss_std_e;
-        20.0,                             // gnss_std_d;
-        Eigen::MatrixXd::Identity(3, 3),  // accm_correction
-        Eigen::MatrixXd::Identity(3, 3),  // gyro_correction 
-        gnss_lever                        // gnss lever arm
-      };
-
-      ESKF eskf(p);
-
-      //gnssConverter = GNSS2NED(40.0, 3.0, 0.0);
 
     }
 
@@ -79,12 +57,12 @@ class ESKFNode : public rclcpp::Node
 
     void gnss_callback(const sensor_msgs::msg::NavSatFix & msg)
     {
-      RCLCPP_INFO(this->get_logger(), "Received gnss!");
-      std::cout << msg.latitude << std::endl;
+      //RCLCPP_INFO(this->get_logger(), "Received gnss!");
+      //std::cout << msg.latitude << std::endl;
 
       Eigen::Vector3d gnssNED = gnssConverter.toNED(msg.latitude, msg.longitude, msg.altitude); 
-      RCLCPP_INFO(this->get_logger(), "Converted to NED: !");
-      std::cout << gnssNED << std::endl;
+      //RCLCPP_INFO(this->get_logger(), "Converted to NED: !");
+      //std::cout << gnssNED << std::endl;
 
     }
 
@@ -94,8 +72,29 @@ class ESKFNode : public rclcpp::Node
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subscription_gnss;
 
     GNSS2NED gnssConverter;
+    
+    static ESKFParams makeEskfParams(){
+      Eigen::Vector3d gnss_lever;
+      gnss_lever << 1.0, 0.0, 2.0;
+      
+      return ESKFParams{
+      2.0, // accm_std
+      4.0, // accm_bias_std
+      6.0, // accm_bias_p
+      8.0, // gyro_std
+      10.0, // gyro_bias_std
+      12.0, // gyro_bias_p
+      20.0, // gnss_std_n
+      20.0, // gnss_std_e
+      20.0, // gnss_std_d
+      Eigen::MatrixXd::Identity(3, 3), // accm_correction
+      Eigen::MatrixXd::Identity(3, 3), // gyro_correction
+      gnss_lever // GNSS lever arm
+      };
+    }
+    
+    ESKF eskf;
 
-    size_t count_;
 };
 
 int main(int argc, char * argv[])
