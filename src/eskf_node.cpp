@@ -1,5 +1,7 @@
 #include "quaternions/quaternions.h"
 #include "eskf/eskf.h"
+#include "gnss2ned/gnss2ned.h"
+
 #include <Eigen/Dense>
 #include <iostream> 
 
@@ -23,7 +25,7 @@ class ESKFNode : public rclcpp::Node
 {
   public:
     ESKFNode()
-    : Node("boaty_eskf_node"), count_(0)
+    : Node("boaty_eskf_node"), count_(0), gnssConverter {GNSS2NED(40.0, 3.0, 0.0)}
     {
       publisher_ = this->create_publisher<std_msgs::msg::String>("topic", 10);
       timer_ = this->create_wall_timer(
@@ -54,6 +56,9 @@ class ESKFNode : public rclcpp::Node
       };
 
       ESKF eskf(p);
+
+      //gnssConverter = GNSS2NED(40.0, 3.0, 0.0);
+
     }
 
   private:
@@ -77,12 +82,19 @@ class ESKFNode : public rclcpp::Node
       RCLCPP_INFO(this->get_logger(), "Received gnss!");
       std::cout << msg.latitude << std::endl;
 
+      Eigen::Vector3d gnssNED = gnssConverter.toNED(msg.latitude, msg.longitude, msg.altitude); 
+      RCLCPP_INFO(this->get_logger(), "Converted to NED: !");
+      std::cout << gnssNED << std::endl;
+
     }
 
     rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr publisher_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_imu;
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subscription_gnss;
+
+    GNSS2NED gnssConverter;
+
     size_t count_;
 };
 

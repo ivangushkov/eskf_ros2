@@ -22,6 +22,11 @@ add_library(quaternions
   src/quaternions.cpp
 )
 
+# GNSS conversion library
+add_library(gnss2ned
+  src/gnss2ned.cpp
+)
+
 # ESKF implementation
 add_library(eskf
   src/eskf.cpp
@@ -35,14 +40,19 @@ target_include_directories(
 )
 
 target_include_directories(
+  gnss2ned
+  PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
+target_include_directories(
   eskf
   PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
-
-#add_executable(eskf_node src/eskf_node.cpp src/quaternions.cpp src/eskf.cpp)
 add_executable(eskf_node src/eskf_node.cpp)
 
 ament_target_dependencies(eskf_node rclcpp std_msgs sensor_msgs)
@@ -58,6 +68,11 @@ PUBLIC
 Eigen3::Eigen
 )
 
+target_link_libraries(gnss2ned
+PUBLIC
+Eigen3::Eigen
+)
+
 target_link_libraries(eskf
 PUBLIC
 quaternions
@@ -68,6 +83,7 @@ Eigen3::Eigen
 target_link_libraries(eskf_node
 Eigen3::Eigen
 eskf
+gnss2ned
 )
 
 install(

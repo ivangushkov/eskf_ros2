@@ -1,4 +1,5 @@
 #include "quaternions/quaternions.h"
+#include <Eigen/Dense>
 
 // Default initialization to the zero-rotation quaternion
 RotationQuaternion::RotationQuaternion()
