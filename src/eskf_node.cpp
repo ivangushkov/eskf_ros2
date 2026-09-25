@@ -19,9 +19,6 @@
 using namespace std::chrono_literals;
 using std::placeholders::_1;
 
-/* This example creates a subclass of Node and uses std::bind() to register a
-* member function as a callback from the timer. */
-
 class ESKFNode : public rclcpp::Node
 {
   public:
@@ -29,8 +26,6 @@ class ESKFNode : public rclcpp::Node
     : Node("boaty_eskf_node"), gnssConverter {GNSS2NED(40.0, 3.0, 0.0)}, eskf(makeEskfParams())
     {
       publisher_eskf = this->create_publisher<nav_msgs::msg::Odometry>("/boaty/odom_filtered", 10);
-      timer_ = this->create_wall_timer(
-      500ms, std::bind(&ESKFNode::timer_callback, this));
 
       subscription_imu = this->create_subscription<sensor_msgs::msg::Imu>(
       "/boaty/imu", 10, std::bind(&ESKFNode::imu_callback, this, _1));
@@ -41,13 +36,6 @@ class ESKFNode : public rclcpp::Node
     }
 
   private:
-    void timer_callback()
-    {
-      auto message = std_msgs::msg::String();
-      //message.data = "Hello, world! " + std::to_string(count_++);
-      //RCLCPP_INFO(this->get_logger(), "Publishing: '%s'", message.data.c_str());
-      //publisher_->publish(message);
-    }
     
     void imu_callback(const sensor_msgs::msg::Imu & msg)
     {
@@ -173,7 +161,6 @@ class ESKFNode : public rclcpp::Node
 
     }
 
-    rclcpp::TimerBase::SharedPtr timer_;
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr publisher_eskf;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr subscription_imu;
     rclcpp::Subscription<sensor_msgs::msg::NavSatFix>::SharedPtr subscription_gnss;
