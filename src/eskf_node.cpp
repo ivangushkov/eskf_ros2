@@ -80,6 +80,36 @@ class ESKFNode : public rclcpp::Node
 
       eskf.predictFromIMU(zIMU);
 
+      NominalState xEst = eskf.getNomState();
+
+      auto msgOdom = nav_msgs::msg::Odometry();
+      
+      msgOdom.header = msg.header;
+      msgOdom.child_frame_id = "Boaty/base_link";
+      
+      msgOdom.pose.pose.position.x = xEst.pos(0);
+      msgOdom.pose.pose.position.y = xEst.pos(1);
+      msgOdom.pose.pose.position.z = xEst.pos(2);
+      
+      msgOdom.pose.pose.orientation.x = xEst.ori.vec_part(0);
+      msgOdom.pose.pose.orientation.y = xEst.ori.vec_part(1);
+      msgOdom.pose.pose.orientation.z = xEst.ori.vec_part(2);
+      msgOdom.pose.pose.orientation.w = xEst.ori.real_part;
+
+      msgOdom.twist.twist.linear.x = xEst.vel(0);
+      msgOdom.twist.twist.linear.y = xEst.vel(1);
+      msgOdom.twist.twist.linear.z = xEst.vel(2);
+
+      // Use the IMU angular velocity measurement
+      msgOdom.twist.twist.angular.x = avel(0);
+      msgOdom.twist.twist.angular.y = avel(1);
+      msgOdom.twist.twist.angular.z = avel(2);
+
+      have_avel = 1;
+      avelIMU = avel;
+      
+      publisher_eskf->publish(msgOdom);
+
     }
 
     void gnss_callback(const sensor_msgs::msg::NavSatFix & msg)
@@ -111,6 +141,36 @@ class ESKFNode : public rclcpp::Node
 
       eskf.updateFromGNSS(zGNSS);
 
+
+      NominalState xEst = eskf.getNomState();
+
+      auto msgOdom = nav_msgs::msg::Odometry();
+      
+      msgOdom.header = msg.header;
+      msgOdom.child_frame_id = "Boaty/base_link";
+      
+      msgOdom.pose.pose.position.x = xEst.pos(0);
+      msgOdom.pose.pose.position.y = xEst.pos(1);
+      msgOdom.pose.pose.position.z = xEst.pos(2);
+      
+      msgOdom.pose.pose.orientation.x = xEst.ori.vec_part(0);
+      msgOdom.pose.pose.orientation.y = xEst.ori.vec_part(1);
+      msgOdom.pose.pose.orientation.z = xEst.ori.vec_part(2);
+      msgOdom.pose.pose.orientation.w = xEst.ori.real_part;
+
+      msgOdom.twist.twist.linear.x = xEst.vel(0);
+      msgOdom.twist.twist.linear.y = xEst.vel(1);
+      msgOdom.twist.twist.linear.z = xEst.vel(2);
+
+      // Use the IMU angular velocity measurement
+      if (have_avel) {
+        msgOdom.twist.twist.angular.x = avelIMU(0);
+        msgOdom.twist.twist.angular.y = avelIMU(1);
+        msgOdom.twist.twist.angular.z = avelIMU(2);
+      }
+      
+      publisher_eskf->publish(msgOdom);
+
     }
 
     rclcpp::TimerBase::SharedPtr timer_;
@@ -120,13 +180,26 @@ class ESKFNode : public rclcpp::Node
 
     rclcpp::Time last_filter_time_; // for calculating dt
     bool first_measurement{1};
+    bool have_avel{0};
+    Eigen::Vector3d avelIMU; // saved from the IMU measurements
     
     GNSS2NED gnssConverter;
     
     static ESKFParams makeEskfParams(){
       Eigen::Vector3d gnss_lever;
       gnss_lever << 0.5, 0.25, -0.4;
-      
+
+      NominalState x0;
+      ErrorStateGauss xErr0;
+
+      x0.pos << 0.0, 0.0, 0.0;
+      x0.vel << 0.0, 0.0, 0.0;
+      x0.ori = RotationQuaternion(); // initializes with zero rotation
+      x0.accm_bias << 0.0, 0.0, 0.0;
+      x0.gyro_bias << 0.0, 0.0, 0.0;
+
+      xErr0.cov = 0.25 * Eigen::MatrixXd::Identity(15, 15);
+
       return ESKFParams{
       0.10, // accm_std
       0.25, // accm_bias_std
@@ -139,7 +212,9 @@ class ESKFNode : public rclcpp::Node
       0.5, // gnss_std_d
       Eigen::MatrixXd::Identity(3, 3), // accm_correction
       Eigen::MatrixXd::Identity(3, 3), // gyro_correction
-      gnss_lever // GNSS lever arm
+      gnss_lever, // GNSS lever arm
+      x0, // initial nominal state
+      xErr0 // initial error state (for covariance)
       };
     }
     

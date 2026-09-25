@@ -7,6 +7,23 @@
 #include <cmath>
 #include "quaternions/quaternions.h"
 
+// Nominal state with quaternion parametrization of the orientation
+struct NominalState{
+    Eigen::Vector3d pos;
+    Eigen::Vector3d vel;
+    RotationQuaternion ori;
+    Eigen::Vector3d accm_bias;
+    Eigen::Vector3d gyro_bias;
+};
+
+// Error state of the ESKF
+struct ErrorStateGauss{
+    Eigen::VectorXd mean;
+    Eigen::MatrixXd cov;
+    float ts;
+};
+
+
 // Tuning and parameters of the ESKF
 struct ESKFParams{
     float accm_std;
@@ -24,22 +41,8 @@ struct ESKFParams{
     Eigen::Matrix3d accm_correction_matrix;
     Eigen::Matrix3d gyro_correction_matrix;
     Eigen::Vector3d gnss_lever;
-};
-
-// Nominal state with quaternion parametrization of the orientation
-struct NominalState{
-    Eigen::Vector3d pos;
-    Eigen::Vector3d vel;
-    RotationQuaternion ori;
-    Eigen::Vector3d accm_bias;
-    Eigen::Vector3d gyro_bias;
-};
-
-// Error state of the ESKF
-struct ErrorStateGauss{
-    Eigen::VectorXd mean;
-    Eigen::MatrixXd cov;
-    float ts;
+    NominalState x0;
+    ErrorStateGauss xErr0; // for covariance initialization
 };
 
 struct ESKFState{

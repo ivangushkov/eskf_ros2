@@ -38,6 +38,10 @@ ESKF::ESKF(ESKFParams p)
     gnssCov(1, 1) = p.gnss_std_e;
     gnssCov(2, 2) = p.gnss_std_d;
 
+    // Initial guesses
+    nomState = p.x0;
+    errorState = p.xErr0;
+
 }
 
 // Getter methods for the filter state
