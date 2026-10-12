@@ -65,10 +65,14 @@ class ESKFNode : public rclcpp::Node
       avel << msg.angular_velocity.x, msg.angular_velocity.y, msg.angular_velocity.z;
       
       IMUMeasurement zIMU{acc, avel, ts};
-
+      
+      //RCLCPP_INFO(this->get_logger(), "Doing an IMU step!");
       eskf.predictFromIMU(zIMU);
 
       NominalState xEst = eskf.getNomState();
+
+      //std::cout << "Accm bias estimate:" << xEst.accm_bias << std::endl;
+      //std::cout << "Gyro bias estimate:" << xEst.gyro_bias << std::endl;
 
       auto msgOdom = nav_msgs::msg::Odometry();
       
@@ -102,7 +106,6 @@ class ESKFNode : public rclcpp::Node
 
     void gnss_callback(const sensor_msgs::msg::NavSatFix & msg)
     {
-      //RCLCPP_INFO(this->get_logger(), "Received gnss!");
       //std::cout << msg.latitude << std::endl;
 
       Eigen::Vector3d gnssNED = gnssConverter.toNED(msg.latitude, msg.longitude, msg.altitude); 
@@ -126,7 +129,9 @@ class ESKFNode : public rclcpp::Node
       }
 
       GNSSMeasurement zGNSS{gnssNED, ts};
+      
 
+      //RCLCPP_INFO(this->get_logger(), "Performing GNSS update!");
       eskf.updateFromGNSS(zGNSS);
 
 
@@ -186,7 +191,8 @@ class ESKFNode : public rclcpp::Node
       x0.gyro_bias << 0.0, 0.0, 0.0;
 
       xErr0.cov = 0.25 * Eigen::MatrixXd::Identity(15, 15);
-
+      xErr0.mean = Eigen::VectorXd::Zero(15);
+      
       return ESKFParams{
       0.10, // accm_std
       0.25, // accm_bias_std
@@ -194,9 +200,9 @@ class ESKFNode : public rclcpp::Node
       0.10, // gyro_std
       0.25, // gyro_bias_std
       0.0005, // gyro_bias_p
-      0.5, // gnss_std_n
-      0.5, // gnss_std_e
-      0.5, // gnss_std_d
+      0.0005, // gnss_std_n
+      0.0005, // gnss_std_e
+      0.0005, // gnss_std_d
       Eigen::MatrixXd::Identity(3, 3), // accm_correction
       Eigen::MatrixXd::Identity(3, 3), // gyro_correction
       gnss_lever, // GNSS lever arm
