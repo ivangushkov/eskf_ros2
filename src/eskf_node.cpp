@@ -52,6 +52,8 @@ class ESKFNode : public rclcpp::Node
       }
 
       float ts = (measurement_time - last_filter_time_).seconds();
+      //std::cout << "IMU time-step: " << ts << std::endl;
+      last_filter_time_ = measurement_time;
 
       if (ts <= 0.0) {
         RCLCPP_INFO(get_logger(), "Ignoring duplicate or out of sequence measurement");
@@ -122,6 +124,8 @@ class ESKFNode : public rclcpp::Node
       }
 
       float ts = (measurement_time - last_filter_time_).seconds();
+      //std::cout << "GNSS time-step: " << ts << std::endl;
+      last_filter_time_ = measurement_time;
 
       if (ts <= 0.0) {
         RCLCPP_INFO(get_logger(), "Ignoring duplicate or out of sequence measurement");
@@ -200,9 +204,9 @@ class ESKFNode : public rclcpp::Node
       0.10, // gyro_std
       0.25, // gyro_bias_std
       0.0005, // gyro_bias_p
-      0.0005, // gnss_std_n
-      0.0005, // gnss_std_e
-      0.0005, // gnss_std_d
+      0.005, // gnss_std_n
+      0.005, // gnss_std_e
+      0.005, // gnss_std_d
       Eigen::MatrixXd::Identity(3, 3), // accm_correction
       Eigen::MatrixXd::Identity(3, 3), // gyro_correction
       gnss_lever, // GNSS lever arm

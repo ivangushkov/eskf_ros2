@@ -3,6 +3,7 @@
 #include<Eigen/Dense>
 #include <unsupported/Eigen/MatrixFunctions> // for that exponential matrix
 
+#include <iostream>
 #include<cmath>
 #include "quaternions/quaternions.h"
 
@@ -130,7 +131,6 @@ ErrorStateGauss ESKF::predictErrorState(NominalState x_nom_prev, ErrorStateGauss
     G.block(12, 9, 3, 3) = Eigen::Matrix3d::Identity();
     
     Eigen::MatrixXd GQGTc = G * Q_err * G.transpose();
-
     // Discretization of system matrix and process noise
     float Ts = z_imu_corr.ts;
     Eigen::MatrixXd VL = Eigen::MatrixXd::Zero(30, 30); // VanLoan matrix
@@ -151,7 +151,6 @@ ErrorStateGauss ESKF::predictErrorState(NominalState x_nom_prev, ErrorStateGauss
     // Finally Ad and GQGTd
     Eigen::MatrixXd Ad = VL1.transpose();
     Eigen::MatrixXd GQGTd = VL1.transpose() * VL2;
-
     ErrorStateGauss x_err_gauss_pred{
         Ad * x_err_gauss.mean,
         Ad * x_err_gauss.cov * Ad.transpose() + GQGTd,
@@ -166,16 +165,13 @@ void ESKF::predictFromIMU(IMUMeasurement z_imu) {
 
     NominalState x_nom_prev = nomState;
     ErrorStateGauss x_err_gauss = errorState;
-
+    
     // Correct the IMU measurements for mounting errors
     IMUMeasurement z_imu_corr = this->correctIMUMeasurement(x_nom_prev, z_imu);
-
     // Integrate the nominal system dynamics with the imu as input
     NominalState x_nom_pred = this->predictNominalState(x_nom_prev, z_imu_corr);
-
     // Update the error state covariance
     ErrorStateGauss x_err_pred = this->predictErrorState(x_nom_prev, x_err_gauss, z_imu_corr);
-
     // Update internal state with the predictions
     nomState = x_nom_pred;
     errorState = x_err_gauss;
@@ -234,7 +230,7 @@ ESKFState ESKF::inject(NominalState xNomPrev, ErrorStateGauss xErrUpd) {
     updatedState.nomState.vel = xNomPrev.vel + xErrUpd.mean(Eigen::seq(3,5));
     updatedState.nomState.ori = xNomPrev.ori.multiply(errQuat);
     updatedState.nomState.accm_bias = xNomPrev.accm_bias + xErrUpd.mean(Eigen::seq(9,11));
-    updatedState.nomState.accm_bias = xNomPrev.accm_bias + xErrUpd.mean(Eigen::seq(12,14));
+    updatedState.nomState.gyro_bias = xNomPrev.gyro_bias + xErrUpd.mean(Eigen::seq(12,14));
 
     // Reset the error state mean
     updatedState.errorState.mean = Eigen::VectorXd::Zero(xErrUpd.mean.size());
